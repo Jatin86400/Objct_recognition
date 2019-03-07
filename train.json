@@ -2,27 +2,27 @@
     "exp_dir": "/home/jatin/flipkart/",
     "mode": "train",
     "lr": 1e-3,
-    "weight_decay":1e-5,
-    "max_epochs": 70,
+    "weight_decay":0,
+    "max_epochs": 90,
     "print_freq": 200,
     "val_freq": 700,
-    "input_height":120,
-    "input_width":160,
-    "input_channels":1,
+    "input_height":224,
+    "input_width":224,
+    "input_channels":3,
     "dataset": {
         "train" : {
-            "batch_size": 8,
+            "batch_size": 16,
             "num_workers": 8,
-            "input_height":120,
-            "input_width":160,
-            "input_channels":1
+            "input_height":224,
+            "input_width":224,
+            "input_channels":3
         },
         "train_val" : {
             "batch_size": 1,
             "num_workers": 8,
-            "input_height":120,
-            "input_width":160,
-            "input_channels":1
+            "input_height":224,
+            "input_width":224,
+            "input_channels":3
         }
     }
 }

@@ -5,6 +5,8 @@ import pandas as pd
 import os.path as osp
 import cv2
 import multiprocessing.dummy as multiprocessing
+from torchvision import transforms
+import random
 def collate_fn(batch_list):
     keys = batch_list[0].keys()
     collated = {}
@@ -43,15 +45,15 @@ class DataProvider(Dataset):
         dataset = pd.read_csv('/home/jatin/flipkart/'+self.split+'.csv')
         print(len(dataset['image_name']))
         if self.mode!='test':
-            for step,i in enumerate(dataset['image_name']):
-                self.image_name = dataset['image_name']
-                self.x1 = dataset['x1']
-                self.x2 = dataset['x2']
-                self.y1 = dataset['y1']
-                self.y2 = dataset['y2']
+            #for step,i in enumerate(dataset['image_name']):
+            self.image_name = dataset['image_name']
+            self.x1 = dataset['x1']
+            self.x2 = dataset['x2']
+            self.y1 = dataset['y1']
+            self.y2 = dataset['y2']
         else:
-            for step,i in enumerate(dataset['image_name']):
-                self.image_name = dataset['image_name']
+            #for step,i in enumerate(dataset['image_name']):
+            self.image_name = dataset['image_name']
     def __len__(self):
         return len(self.image_name)
 
@@ -69,7 +71,7 @@ class DataProvider(Dataset):
         y2 = self.y2[idx]
         results = {}
         img = cv2.imread('/home/jatin/flipkart/images/'+image_name)
-        img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        #img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
         height = img.shape[0]
         width = img.shape[1]
         x_center = float(x1+x2)/2
@@ -82,11 +84,24 @@ class DataProvider(Dataset):
         gt = torch.Tensor(gt)
         gt = gt.view(1,4)
         img = cv2.resize(img,(self.opts["input_height"],self.opts["input_width"]), interpolation = cv2.INTER_AREA)
-        normalizedImg = np.zeros((self.opts["input_height"], self.opts["input_width"]))
-        normalizedImg = cv2.normalize(img,  normalizedImg, 0, 1, cv2.NORM_MINMAX)
-        img = normalizedImg
+        #color_jitter = transforms.ColorJitter(brightness=5, contrast=5)
+        #grey_scale = transforms.Grayscale(3)
+       # pil = transforms.ToPILImage()
+        
+        #if self.mode=="train":
+          #  img = pil(img)
+           # if random.randint(1,10)==1:
+           #     img = color_jitter(img)
+           # if random.randint(1,10)==1:
+           #     img = grey_scale(img)
+           # img = np.array(img)
+           # if random.randint(1,10)==1:
+           #     img = cv2.GaussianBlur(img,(3,3),0)
+            
+        #img = cv2.GaussianBlur(img,(5,5),0)
         img = torch.from_numpy(img)
-        img = img.float()
+        #img = img.float()
+        results['image_name'] = image_name
         results['img'] = img
         results['gt']=gt
         results['h']=height
@@ -96,11 +111,9 @@ class DataProvider(Dataset):
         image_name = self.image_name[idx]
         results = {}
         img = cv2.imread('/home/jatin/flipkart/images/'+image_name)
-        img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        #img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
         img = cv2.resize(img,(self.opts["input_height"],self.opts["input_width"]), interpolation = cv2.INTER_AREA)
-        normalizedImg = np.zeros((self.opts["input_height"], self.opts["input_width"]))
-        normalizedImg = cv2.normalize(img,  normalizedImg, 0, 1, cv2.NORM_MINMAX)
-        img = normalizedImg
+        #img = cv2.GaussianBlur(img,(5,5),0)
         img = torch.from_numpy(img)
         img = img.float()
         results['img'] = img

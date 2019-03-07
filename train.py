@@ -109,7 +109,7 @@ class Trainer(object):
         self.global_step = 0
         self.epoch = 0
         self.opts = opts
-        create_folder(os.path.join(self.opts['exp_dir'], 'checkpoints'))
+        create_folder(os.path.join(self.opts['exp_dir'], 'checkpoints_resnet152'))
 
        # Copy experiment file
         os.system('cp %s %s'%(args.exp, self.opts['exp_dir']))
@@ -122,7 +122,8 @@ class Trainer(object):
         self.optimizer = optim.Adam(self.model.parameters(),lr = self.opts['lr'],weight_decay=self.opts['weight_decay'])
         for name,param in self.model.named_parameters():
             print(name)
-       
+        if args.resume is not None:
+            self.resume(args.resume)
     def save_checkpoint(self, epoch):
         save_state = {
             'epoch': epoch,
@@ -131,13 +132,13 @@ class Trainer(object):
             'optimizer': self.optimizer.state_dict(),
         }
 
-        save_name = os.path.join(self.opts['exp_dir'], 'checkpoints', 'epoch%d_step%d.pth'\
+        save_name = os.path.join(self.opts['exp_dir'], 'checkpoints_resnet152', 'epoch%d_step%d.pth'\
         %(epoch, self.global_step))
         torch.save(save_state, save_name)
         print('Saved model')
 
     def resume(self, path):
-        self.model.reload(path)
+        self.model.load_state_dict(torch.load(path, map_location=lambda storage, loc: storage)['state_dict'])
         save_state = torch.load(path, map_location=lambda storage, loc: storage)
         self.global_step = save_state['global_step']
         self.epoch = save_state['epoch']
@@ -171,7 +172,12 @@ class Trainer(object):
             img = img.float()
             output = self.model(img.cuda())
             self.optimizer.zero_grad()
-            loss = self.loss_fn(output,gt)           
+            loss_x1 = self.loss_fn(output[:,0]-output[:,2]/2,gt[:,0]-gt[:,2]/2)
+            loss_y1 = self.loss_fn(output[:,1]-output[:,3]/2,gt[:,1]-gt[:,3]/2)
+            loss_x2 = self.loss_fn(output[:,0]+output[:,2]/2,gt[:,0]+gt[:,2]/2)
+            loss_y2 = self.loss_fn(output[:,1]+output[:,3]/2,gt[:,1]+gt[:,3]/2)
+            loss = (loss_x1*4 + 3*loss_y1 + 4*loss_x2 +3*loss_y2)/4
+            #loss = self.loss_fn(output,gt)
             loss.backward()
             self.optimizer.step()
             losses.append(loss.item())
@@ -199,19 +205,28 @@ class Trainer(object):
         print('Validating')
         self.model.eval()
         ious = []
+        losses = []
         with torch.no_grad():
             for step, data in enumerate(tqdm(self.val_loader)):
                 img = data['img']
                 gt = data['gt']
-                gt = torch.cat(gt)
+                gt = torch.cat(gt).to(device)
                 img = torch.cat(img)
                 img = img.view(-1,self.opts["input_height"],self.opts["input_width"],self.opts["input_channels"])
                 img = torch.transpose(img,1,3)
                 img = torch.transpose(img,2,3)
                 img = img.float()
                 output= self.model(img.cuda())
-                gt = gt.numpy()
+                loss_x1 = self.loss_fn(output[:,0]-output[:,2]/2,gt[:,0]-gt[:,2]/2)
+                loss_y1 = self.loss_fn(output[:,1]-output[:,3]/2,gt[:,1]-gt[:,3]/2)
+                loss_x2 = self.loss_fn(output[:,0]+output[:,2]/2,gt[:,0]+gt[:,2]/2)
+                loss_y2 = self.loss_fn(output[:,1]+output[:,3]/2,gt[:,1]+gt[:,3]/2)
+                loss = (loss_x1*4 + loss_y1*3 + loss_x2*4 +loss_y2*3)/4
+                #loss = self.loss_fn(output,gt)
+                losses.append(loss.item())
+                gt = gt.cpu().numpy()
                 output = output.cpu().numpy()
+                
                 gt_x2 = math.floor(min(gt[0,0]+gt[0,2]/2,1)*640)
                 gt_y2= math.floor(min(gt[0,1]+gt[0,3]/2,1)*480)
                 gt_x1 = math.floor(max(gt[0,0]-gt[0,2]/2,0)*640)
@@ -224,10 +239,13 @@ class Trainer(object):
                 ious.append(iou)
                 del(output)
         avg_iou=0
-        for i in ious:
-            avg_iou+=i
+        avg_loss = 0
+        for i,iou in enumerate(ious):
+            avg_iou+=iou
+            avg_loss += losses[i]
         avg_iou = avg_iou/len(ious)
-        print("Average iou is ",avg_iou)
+        avg_loss = avg_loss/len(losses)
+        print("Average iou is %f and loss is %f"%(avg_iou,avg_loss))
         self.model.train()
 if __name__ == '__main__':
     args = get_args()
